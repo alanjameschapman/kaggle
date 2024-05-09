@@ -1,1 +1,1918 @@
-{"metadata":{"kernelspec":{"display_name":"Python 3","language":"python","name":"python3"},"language_info":{"name":"python","version":"3.10.13","mimetype":"text/x-python","codemirror_mode":{"name":"ipython","version":3},"pygments_lexer":"ipython3","nbconvert_exporter":"python","file_extension":".py"},"kaggle":{"accelerator":"none","dataSources":[{"sourceId":10211,"databundleVersionId":111096,"sourceType":"competition"}],"isInternetEnabled":false,"language":"python","sourceType":"notebook","isGpuEnabled":false}},"nbformat_minor":4,"nbformat":4,"cells":[{"cell_type":"markdown","source":"**This notebook is an exercise in the [Intermediate Machine Learning](https://www.kaggle.com/learn/intermediate-machine-learning) course.  You can reference the tutorial at [this link](https://www.kaggle.com/alexisbcook/missing-values).**\n\n---\n","metadata":{}},{"cell_type":"markdown","source":"Now it's your turn to test your new knowledge of **missing values** handling. You'll probably find it makes a big difference.\n\n# Setup\n\nThe questions will give you feedback on your work. Run the following cell to set up the feedback system.","metadata":{}},{"cell_type":"code","source":"# Set up code checking\nimport os\nif not os.path.exists(\"../input/train.csv\"):\n    os.symlink(\"../input/home-data-for-ml-course/train.csv\", \"../input/train.csv\")  \n    os.symlink(\"../input/home-data-for-ml-course/test.csv\", \"../input/test.csv\") \nfrom learntools.core import binder\nbinder.bind(globals())\nfrom learntools.ml_intermediate.ex2 import *\nprint(\"Setup Complete\")","metadata":{"execution":{"iopub.status.busy":"2024-05-09T05:59:11.050615Z","iopub.execute_input":"2024-05-09T05:59:11.050948Z","iopub.status.idle":"2024-05-09T05:59:12.029552Z","shell.execute_reply.started":"2024-05-09T05:59:11.050922Z","shell.execute_reply":"2024-05-09T05:59:12.028487Z"},"trusted":true},"execution_count":1,"outputs":[{"name":"stdout","text":"Setup Complete\n","output_type":"stream"}]},{"cell_type":"markdown","source":"In this exercise, you will work with data from the [Housing Prices Competition for Kaggle Learn Users](https://www.kaggle.com/c/home-data-for-ml-course). \n\n![Ames Housing dataset image](https://storage.googleapis.com/kaggle-media/learn/images/lTJVG4e.png)\n\nRun the next code cell without changes to load the training and validation sets in `X_train`, `X_valid`, `y_train`, and `y_valid`.  The test set is loaded in `X_test`.","metadata":{}},{"cell_type":"code","source":"import pandas as pd\nfrom sklearn.model_selection import train_test_split\n\n# Read the data\nX_full = pd.read_csv('../input/train.csv', index_col='Id')\nX_test_full = pd.read_csv('../input/test.csv', index_col='Id')\n\n# Remove rows with missing target, separate target from predictors\nX_full.dropna(axis=0, subset=['SalePrice'], inplace=True)\ny = X_full.SalePrice\nX_full.drop(['SalePrice'], axis=1, inplace=True)\n\n# To keep things simple, we'll use only numerical predictors\nX = X_full.select_dtypes(exclude=['object'])\nX_test = X_test_full.select_dtypes(exclude=['object'])\n\n# Break off validation set from training data\nX_train, X_valid, y_train, y_valid = train_test_split(X, y, train_size=0.8, test_size=0.2,\n                                                      random_state=0)","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:03:55.641340Z","iopub.execute_input":"2024-05-09T06:03:55.641761Z","iopub.status.idle":"2024-05-09T06:03:56.268613Z","shell.execute_reply.started":"2024-05-09T06:03:55.641730Z","shell.execute_reply":"2024-05-09T06:03:56.267615Z"},"trusted":true},"execution_count":2,"outputs":[]},{"cell_type":"markdown","source":"Use the next code cell to print the first five rows of the data.","metadata":{}},{"cell_type":"code","source":"X_train.head()","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:04:02.541009Z","iopub.execute_input":"2024-05-09T06:04:02.541604Z","iopub.status.idle":"2024-05-09T06:04:02.566433Z","shell.execute_reply.started":"2024-05-09T06:04:02.541576Z","shell.execute_reply":"2024-05-09T06:04:02.565638Z"},"trusted":true},"execution_count":3,"outputs":[{"execution_count":3,"output_type":"execute_result","data":{"text/plain":"     MSSubClass  LotFrontage  LotArea  OverallQual  OverallCond  YearBuilt  \\\nId                                                                           \n619          20         90.0    11694            9            5       2007   \n871          20         60.0     6600            5            5       1962   \n93           30         80.0    13360            5            7       1921   \n818          20          NaN    13265            8            5       2002   \n303          20        118.0    13704            7            5       2001   \n\n     YearRemodAdd  MasVnrArea  BsmtFinSF1  BsmtFinSF2  ...  GarageArea  \\\nId                                                     ...               \n619          2007       452.0          48           0  ...         774   \n871          1962         0.0           0           0  ...         308   \n93           2006         0.0         713           0  ...         432   \n818          2002       148.0        1218           0  ...         857   \n303          2002       150.0           0           0  ...         843   \n\n     WoodDeckSF  OpenPorchSF  EnclosedPorch  3SsnPorch  ScreenPorch  PoolArea  \\\nId                                                                              \n619           0          108              0          0          260         0   \n871           0            0              0          0            0         0   \n93            0            0             44          0            0         0   \n818         150           59              0          0            0         0   \n303         468           81              0          0            0         0   \n\n     MiscVal  MoSold  YrSold  \nId                            \n619        0       7    2007  \n871        0       8    2009  \n93         0       8    2009  \n818        0       7    2008  \n303        0       1    2006  \n\n[5 rows x 36 columns]","text/html":"<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>MSSubClass</th>\n      <th>LotFrontage</th>\n      <th>LotArea</th>\n      <th>OverallQual</th>\n      <th>OverallCond</th>\n      <th>YearBuilt</th>\n      <th>YearRemodAdd</th>\n      <th>MasVnrArea</th>\n      <th>BsmtFinSF1</th>\n      <th>BsmtFinSF2</th>\n      <th>...</th>\n      <th>GarageArea</th>\n      <th>WoodDeckSF</th>\n      <th>OpenPorchSF</th>\n      <th>EnclosedPorch</th>\n      <th>3SsnPorch</th>\n      <th>ScreenPorch</th>\n      <th>PoolArea</th>\n      <th>MiscVal</th>\n      <th>MoSold</th>\n      <th>YrSold</th>\n    </tr>\n    <tr>\n      <th>Id</th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n      <th></th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>619</th>\n      <td>20</td>\n      <td>90.0</td>\n      <td>11694</td>\n      <td>9</td>\n      <td>5</td>\n      <td>2007</td>\n      <td>2007</td>\n      <td>452.0</td>\n      <td>48</td>\n      <td>0</td>\n      <td>...</td>\n      <td>774</td>\n      <td>0</td>\n      <td>108</td>\n      <td>0</td>\n      <td>0</td>\n      <td>260</td>\n      <td>0</td>\n      <td>0</td>\n      <td>7</td>\n      <td>2007</td>\n    </tr>\n    <tr>\n      <th>871</th>\n      <td>20</td>\n      <td>60.0</td>\n      <td>6600</td>\n      <td>5</td>\n      <td>5</td>\n      <td>1962</td>\n      <td>1962</td>\n      <td>0.0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>...</td>\n      <td>308</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>8</td>\n      <td>2009</td>\n    </tr>\n    <tr>\n      <th>93</th>\n      <td>30</td>\n      <td>80.0</td>\n      <td>13360</td>\n      <td>5</td>\n      <td>7</td>\n      <td>1921</td>\n      <td>2006</td>\n      <td>0.0</td>\n      <td>713</td>\n      <td>0</td>\n      <td>...</td>\n      <td>432</td>\n      <td>0</td>\n      <td>0</td>\n      <td>44</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>8</td>\n      <td>2009</td>\n    </tr>\n    <tr>\n      <th>818</th>\n      <td>20</td>\n      <td>NaN</td>\n      <td>13265</td>\n      <td>8</td>\n      <td>5</td>\n      <td>2002</td>\n      <td>2002</td>\n      <td>148.0</td>\n      <td>1218</td>\n      <td>0</td>\n      <td>...</td>\n      <td>857</td>\n      <td>150</td>\n      <td>59</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>7</td>\n      <td>2008</td>\n    </tr>\n    <tr>\n      <th>303</th>\n      <td>20</td>\n      <td>118.0</td>\n      <td>13704</td>\n      <td>7</td>\n      <td>5</td>\n      <td>2001</td>\n      <td>2002</td>\n      <td>150.0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>...</td>\n      <td>843</td>\n      <td>468</td>\n      <td>81</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>2006</td>\n    </tr>\n  </tbody>\n</table>\n<p>5 rows × 36 columns</p>\n</div>"},"metadata":{}}]},{"cell_type":"markdown","source":"You can already see a few missing values in the first several rows.  In the next step, you'll obtain a more comprehensive understanding of the missing values in the dataset.\n\n# Step 1: Preliminary investigation\n\nRun the code cell below without changes.","metadata":{}},{"cell_type":"code","source":"# Shape of training data (num_rows, num_columns)\nprint(X_train.shape)\n\n# Number of missing values in each column of training data\nmissing_val_count_by_column = (X_train.isnull().sum())\nprint(missing_val_count_by_column[missing_val_count_by_column > 0])","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:06:20.791226Z","iopub.execute_input":"2024-05-09T06:06:20.791647Z","iopub.status.idle":"2024-05-09T06:06:20.799895Z","shell.execute_reply.started":"2024-05-09T06:06:20.791618Z","shell.execute_reply":"2024-05-09T06:06:20.798741Z"},"trusted":true},"execution_count":4,"outputs":[{"name":"stdout","text":"(1168, 36)\nLotFrontage    212\nMasVnrArea       6\nGarageYrBlt     58\ndtype: int64\n","output_type":"stream"}]},{"cell_type":"markdown","source":"### Part A\n\nUse the above output to answer the questions below.","metadata":{}},{"cell_type":"code","source":"# Fill in the line below: How many rows are in the training data?\nnum_rows = 1168\n\n# Fill in the line below: How many columns in the training data\n# have missing values?\nnum_cols_with_missing = 3\n\n# Fill in the line below: How many missing entries are contained in \n# all of the training data?\ntot_missing = 276\n\n# Check your answers\nstep_1.a.check()","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:10:54.091316Z","iopub.execute_input":"2024-05-09T06:10:54.091722Z","iopub.status.idle":"2024-05-09T06:10:54.100914Z","shell.execute_reply.started":"2024-05-09T06:10:54.091695Z","shell.execute_reply":"2024-05-09T06:10:54.099719Z"},"trusted":true},"execution_count":5,"outputs":[{"output_type":"display_data","data":{"text/plain":"<IPython.core.display.Javascript object>","application/javascript":"parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 1, \"questionId\": \"1.1_InvestigateEquality\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"Correct","text/markdown":"<span style=\"color:#33cc33\">Correct</span>"},"metadata":{}}]},{"cell_type":"code","source":"# Lines below will give you a hint or solution code\n#step_1.a.hint()\n#step_1.a.solution()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"### Part B\nConsidering your answers above, what do you think is likely the best approach to dealing with the missing values?","metadata":{}},{"cell_type":"code","source":"# Check your answer (Run this code cell to receive credit!)\nstep_1.b.check()","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:11:33.991428Z","iopub.execute_input":"2024-05-09T06:11:33.991827Z","iopub.status.idle":"2024-05-09T06:11:34.000694Z","shell.execute_reply.started":"2024-05-09T06:11:33.991797Z","shell.execute_reply":"2024-05-09T06:11:33.999939Z"},"trusted":true},"execution_count":6,"outputs":[{"output_type":"display_data","data":{"text/plain":"<IPython.core.display.Javascript object>","application/javascript":"parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 4, \"questionId\": \"1.2_InvestigateThought\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"Correct: \n\nSince there are relatively few missing entries in the data (the column with the greatest percentage of missing values is missing less than 20% of its entries), we can expect that dropping columns is unlikely to yield good results.  This is because we'd be throwing away a lot of valuable data, and so imputation will likely perform better.","text/markdown":"<span style=\"color:#33cc33\">Correct:</span> \n\nSince there are relatively few missing entries in the data (the column with the greatest percentage of missing values is missing less than 20% of its entries), we can expect that dropping columns is unlikely to yield good results.  This is because we'd be throwing away a lot of valuable data, and so imputation will likely perform better."},"metadata":{}}]},{"cell_type":"code","source":"#step_1.b.hint()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"To compare different approaches to dealing with missing values, you'll use the same `score_dataset()` function from the tutorial.  This function reports the [mean absolute error](https://en.wikipedia.org/wiki/Mean_absolute_error) (MAE) from a random forest model.","metadata":{}},{"cell_type":"code","source":"from sklearn.ensemble import RandomForestRegressor\nfrom sklearn.metrics import mean_absolute_error\n\n# Function for comparing different approaches\ndef score_dataset(X_train, X_valid, y_train, y_valid):\n    model = RandomForestRegressor(n_estimators=100, random_state=0)\n    model.fit(X_train, y_train)\n    preds = model.predict(X_valid)\n    return mean_absolute_error(y_valid, preds)","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:14:27.961150Z","iopub.execute_input":"2024-05-09T06:14:27.961580Z","iopub.status.idle":"2024-05-09T06:14:28.290158Z","shell.execute_reply.started":"2024-05-09T06:14:27.961547Z","shell.execute_reply":"2024-05-09T06:14:28.289074Z"},"trusted":true},"execution_count":7,"outputs":[]},{"cell_type":"markdown","source":"# Step 2: Drop columns with missing values\n\nIn this step, you'll preprocess the data in `X_train` and `X_valid` to remove columns with missing values.  Set the preprocessed DataFrames to `reduced_X_train` and `reduced_X_valid`, respectively.  ","metadata":{}},{"cell_type":"code","source":"# Fill in the line below: get names of columns with missing values\ncols_with_missing = [col for col in X_train.columns\n                     if X_train[col].isnull().any()] # Your code here\n\n# Fill in the lines below: drop columns in training and validation data\nreduced_X_train = X_train.drop(cols_with_missing, axis=1)\nreduced_X_valid = X_valid.drop(cols_with_missing, axis=1)\n\n# Check your answers\nstep_2.check()","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:21:24.761058Z","iopub.execute_input":"2024-05-09T06:21:24.761440Z","iopub.status.idle":"2024-05-09T06:21:24.791135Z","shell.execute_reply.started":"2024-05-09T06:21:24.761415Z","shell.execute_reply":"2024-05-09T06:21:24.789788Z"},"trusted":true},"execution_count":13,"outputs":[{"output_type":"display_data","data":{"text/plain":"<IPython.core.display.Javascript object>","application/javascript":"parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 2, \"questionId\": \"2_DropMissing\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"Correct","text/markdown":"<span style=\"color:#33cc33\">Correct</span>"},"metadata":{}}]},{"cell_type":"code","source":"# Lines below will give you a hint or solution code\nstep_2.hint()\nstep_2.solution()","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:20:16.754931Z","iopub.execute_input":"2024-05-09T06:20:16.755350Z","iopub.status.idle":"2024-05-09T06:20:16.768196Z","shell.execute_reply.started":"2024-05-09T06:20:16.755320Z","shell.execute_reply":"2024-05-09T06:20:16.767300Z"},"trusted":true},"execution_count":12,"outputs":[{"output_type":"display_data","data":{"text/plain":"<IPython.core.display.Javascript object>","application/javascript":"parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 2, \"questionType\": 2, \"questionId\": \"2_DropMissing\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"Hint: Begin by finding the list of columns in the data with missing values.  Then, drop these columns in both the training and validation data with the `drop()` method.","text/markdown":"<span style=\"color:#3366cc\">Hint:</span> Begin by finding the list of columns in the data with missing values.  Then, drop these columns in both the training and validation data with the `drop()` method."},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"<IPython.core.display.Javascript object>","application/javascript":"parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 3, \"questionType\": 2, \"questionId\": \"2_DropMissing\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"Solution: \n```python\n# Get names of columns with missing values\ncols_with_missing = [col for col in X_train.columns\n                     if X_train[col].isnull().any()]\n\n# Drop columns in training and validation data\nreduced_X_train = X_train.drop(cols_with_missing, axis=1)\nreduced_X_valid = X_valid.drop(cols_with_missing, axis=1)\n\n```","text/markdown":"<span style=\"color:#33cc99\">Solution:</span> \n```python\n# Get names of columns with missing values\ncols_with_missing = [col for col in X_train.columns\n                     if X_train[col].isnull().any()]\n\n# Drop columns in training and validation data\nreduced_X_train = X_train.drop(cols_with_missing, axis=1)\nreduced_X_valid = X_valid.drop(cols_with_missing, axis=1)\n\n```"},"metadata":{}}]},{"cell_type":"markdown","source":"Run the next code cell without changes to obtain the MAE for this approach.","metadata":{}},{"cell_type":"code","source":"print(\"MAE (Drop columns with missing values):\")\nprint(score_dataset(reduced_X_train, reduced_X_valid, y_train, y_valid))","metadata":{"execution":{"iopub.status.busy":"2024-05-09T06:22:01.330533Z","iopub.execute_input":"2024-05-09T06:22:01.330887Z","iopub.status.idle":"2024-05-09T06:22:02.565809Z","shell.execute_reply.started":"2024-05-09T06:22:01.330861Z","shell.execute_reply":"2024-05-09T06:22:02.564626Z"},"trusted":true},"execution_count":14,"outputs":[{"name":"stdout","text":"MAE (Drop columns with missing values):\n17837.82570776256\n","output_type":"stream"}]},{"cell_type":"markdown","source":"# Step 3: Imputation\n\n### Part A\n\nUse the next code cell to impute missing values with the mean value along each column.  Set the preprocessed DataFrames to `imputed_X_train` and `imputed_X_valid`.  Make sure that the column names match those in `X_train` and `X_valid`.","metadata":{}},{"cell_type":"code","source":"from sklearn.impute import SimpleImputer\n\n# Fill in the lines below: imputation\n____ # Your code here\nimputed_X_train = ____\nimputed_X_valid = ____\n\n# Fill in the lines below: imputation removed column names; put them back\nimputed_X_train.columns = ____\nimputed_X_valid.columns = ____\n\n# Check your answers\nstep_3.a.check()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"code","source":"# Lines below will give you a hint or solution code\n#step_3.a.hint()\n#step_3.a.solution()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"Run the next code cell without changes to obtain the MAE for this approach.","metadata":{}},{"cell_type":"code","source":"print(\"MAE (Imputation):\")\nprint(score_dataset(imputed_X_train, imputed_X_valid, y_train, y_valid))","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"### Part B\n\nCompare the MAE from each approach.  Does anything surprise you about the results?  Why do you think one approach performed better than the other?","metadata":{}},{"cell_type":"code","source":"# Check your answer (Run this code cell to receive credit!)\nstep_3.b.check()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"code","source":"#step_3.b.hint()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"# Step 4: Generate test predictions\n\nIn this final step, you'll use any approach of your choosing to deal with missing values.  Once you've preprocessed the training and validation features, you'll train and evaluate a random forest model.  Then, you'll preprocess the test data before generating predictions that can be submitted to the competition!\n\n### Part A\n\nUse the next code cell to preprocess the training and validation data.  Set the preprocessed DataFrames to `final_X_train` and `final_X_valid`.  **You can use any approach of your choosing here!**  in order for this step to be marked as correct, you need only ensure:\n- the preprocessed DataFrames have the same number of columns,\n- the preprocessed DataFrames have no missing values, \n- `final_X_train` and `y_train` have the same number of rows, and\n- `final_X_valid` and `y_valid` have the same number of rows.","metadata":{}},{"cell_type":"code","source":"# Preprocessed training and validation features\nfinal_X_train = ____\nfinal_X_valid = ____\n\n# Check your answers\nstep_4.a.check()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"code","source":"# Lines below will give you a hint or solution code\n#step_4.a.hint()\n#step_4.a.solution()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"Run the next code cell to train and evaluate a random forest model.  (*Note that we don't use the `score_dataset()` function above, because we will soon use the trained model to generate test predictions!*)","metadata":{}},{"cell_type":"code","source":"# Define and fit model\nmodel = RandomForestRegressor(n_estimators=100, random_state=0)\nmodel.fit(final_X_train, y_train)\n\n# Get validation predictions and MAE\npreds_valid = model.predict(final_X_valid)\nprint(\"MAE (Your approach):\")\nprint(mean_absolute_error(y_valid, preds_valid))","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"### Part B\n\nUse the next code cell to preprocess your test data.  Make sure that you use a method that agrees with how you preprocessed the training and validation data, and set the preprocessed test features to `final_X_test`.\n\nThen, use the preprocessed test features and the trained model to generate test predictions in `preds_test`.\n\nIn order for this step to be marked correct, you need only ensure:\n- the preprocessed test DataFrame has no missing values, and\n- `final_X_test` has the same number of rows as `X_test`.","metadata":{}},{"cell_type":"code","source":"# Fill in the line below: preprocess test data\nfinal_X_test = ____\n\n# Fill in the line below: get test predictions\npreds_test = ____\n\n# Check your answers\nstep_4.b.check()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"code","source":"# Lines below will give you a hint or solution code\n#step_4.b.hint()\n#step_4.b.solution()","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"Run the next code cell without changes to save your results to a CSV file that can be submitted directly to the competition.","metadata":{}},{"cell_type":"code","source":"# Save test predictions to file\noutput = pd.DataFrame({'Id': X_test.index,\n                       'SalePrice': preds_test})\noutput.to_csv('submission.csv', index=False)","metadata":{},"execution_count":null,"outputs":[]},{"cell_type":"markdown","source":"# Submit your results\n\nOnce you have successfully completed Step 4, you're ready to submit your results to the leaderboard!  (_You also learned how to do this in the previous exercise.  If you need a reminder of how to do this, please use the instructions below._)  \n\nFirst, you'll need to join the competition if you haven't already.  So open a new window by clicking on [this link](https://www.kaggle.com/c/home-data-for-ml-course).  Then click on the **Join Competition** button.\n\n![join competition image](https://storage.googleapis.com/kaggle-media/learn/images/wLmFtH3.png)\n\nNext, follow the instructions below:\n1. Begin by clicking on the **Save Version** button in the top right corner of the window.  This will generate a pop-up window.  \n2. Ensure that the **Save and Run All** option is selected, and then click on the **Save** button.\n3. This generates a window in the bottom left corner of the notebook.  After it has finished running, click on the number to the right of the **Save Version** button.  This pulls up a list of versions on the right of the screen.  Click on the ellipsis **(...)** to the right of the most recent version, and select **Open in Viewer**.  This brings you into view mode of the same page. You will need to scroll down to get back to these instructions.\n4. Click on the **Data** tab near the top of the screen.  Then, click on the file you would like to submit, and click on the **Submit** button to submit your results to the leaderboard.\n\nYou have now successfully submitted to the competition!\n\nIf you want to keep working to improve your performance, select the **Edit** button in the top right of the screen. Then you can change your code and repeat the process. There's a lot of room to improve, and you will climb up the leaderboard as you work.\n\n\n# Keep going\n\nMove on to learn what **[categorical variables](https://www.kaggle.com/alexisbcook/categorical-variables)** are, along with how to incorporate them into your machine learning models.  Categorical variables are very common in real-world data, but you'll get an error if you try to plug them into your models without processing them first!","metadata":{}},{"cell_type":"markdown","source":"---\n\n\n\n\n*Have questions or comments? Visit the [course discussion forum](https://www.kaggle.com/learn/intermediate-machine-learning/discussion) to chat with other learners.*","metadata":{}}]}
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0d5bbd54",
+   "metadata": {
+    "papermill": {
+     "duration": 0.010945,
+     "end_time": "2024-05-09T13:47:50.909852",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:50.898907",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "**This notebook is an exercise in the [Intermediate Machine Learning](https://www.kaggle.com/learn/intermediate-machine-learning) course.  You can reference the tutorial at [this link](https://www.kaggle.com/alexisbcook/missing-values).**\n",
+    "\n",
+    "---\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "91852edc",
+   "metadata": {
+    "papermill": {
+     "duration": 0.011829,
+     "end_time": "2024-05-09T13:47:50.932377",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:50.920548",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Now it's your turn to test your new knowledge of **missing values** handling. You'll probably find it makes a big difference.\n",
+    "\n",
+    "# Setup\n",
+    "\n",
+    "The questions will give you feedback on your work. Run the following cell to set up the feedback system."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "f10be56b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:50.955661Z",
+     "iopub.status.busy": "2024-05-09T13:47:50.955300Z",
+     "iopub.status.idle": "2024-05-09T13:47:51.740929Z",
+     "shell.execute_reply": "2024-05-09T13:47:51.739896Z"
+    },
+    "papermill": {
+     "duration": 0.800177,
+     "end_time": "2024-05-09T13:47:51.744007",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:50.943830",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Setup Complete\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Set up code checking\n",
+    "import os\n",
+    "if not os.path.exists(\"../input/train.csv\"):\n",
+    "    os.symlink(\"../input/home-data-for-ml-course/train.csv\", \"../input/train.csv\")  \n",
+    "    os.symlink(\"../input/home-data-for-ml-course/test.csv\", \"../input/test.csv\") \n",
+    "from learntools.core import binder\n",
+    "binder.bind(globals())\n",
+    "from learntools.ml_intermediate.ex2 import *\n",
+    "print(\"Setup Complete\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "42da6bd4",
+   "metadata": {
+    "papermill": {
+     "duration": 0.01061,
+     "end_time": "2024-05-09T13:47:51.766047",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:51.755437",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "In this exercise, you will work with data from the [Housing Prices Competition for Kaggle Learn Users](https://www.kaggle.com/c/home-data-for-ml-course). \n",
+    "\n",
+    "![Ames Housing dataset image](https://storage.googleapis.com/kaggle-media/learn/images/lTJVG4e.png)\n",
+    "\n",
+    "Run the next code cell without changes to load the training and validation sets in `X_train`, `X_valid`, `y_train`, and `y_valid`.  The test set is loaded in `X_test`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "f509ae90",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:51.789639Z",
+     "iopub.status.busy": "2024-05-09T13:47:51.788630Z",
+     "iopub.status.idle": "2024-05-09T13:47:52.958579Z",
+     "shell.execute_reply": "2024-05-09T13:47:52.957620Z"
+    },
+    "papermill": {
+     "duration": 1.184318,
+     "end_time": "2024-05-09T13:47:52.961012",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:51.776694",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "\n",
+    "# Read the data\n",
+    "X_full = pd.read_csv('../input/train.csv', index_col='Id')\n",
+    "X_test_full = pd.read_csv('../input/test.csv', index_col='Id')\n",
+    "\n",
+    "# Remove rows with missing target, separate target from predictors\n",
+    "X_full.dropna(axis=0, subset=['SalePrice'], inplace=True)\n",
+    "y = X_full.SalePrice\n",
+    "X_full.drop(['SalePrice'], axis=1, inplace=True)\n",
+    "\n",
+    "# To keep things simple, we'll use only numerical predictors\n",
+    "X = X_full.select_dtypes(exclude=['object'])\n",
+    "X_test = X_test_full.select_dtypes(exclude=['object'])\n",
+    "\n",
+    "# Break off validation set from training data\n",
+    "X_train, X_valid, y_train, y_valid = train_test_split(X, y, train_size=0.8, test_size=0.2,\n",
+    "                                                      random_state=0)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "60e4d6d4",
+   "metadata": {
+    "papermill": {
+     "duration": 0.010589,
+     "end_time": "2024-05-09T13:47:52.983008",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:52.972419",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Use the next code cell to print the first five rows of the data."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "d564e3c8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.007351Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.006940Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.034480Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.033205Z"
+    },
+    "papermill": {
+     "duration": 0.042996,
+     "end_time": "2024-05-09T13:47:53.037633",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:52.994637",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>MSSubClass</th>\n",
+       "      <th>LotFrontage</th>\n",
+       "      <th>LotArea</th>\n",
+       "      <th>OverallQual</th>\n",
+       "      <th>OverallCond</th>\n",
+       "      <th>YearBuilt</th>\n",
+       "      <th>YearRemodAdd</th>\n",
+       "      <th>MasVnrArea</th>\n",
+       "      <th>BsmtFinSF1</th>\n",
+       "      <th>BsmtFinSF2</th>\n",
+       "      <th>...</th>\n",
+       "      <th>GarageArea</th>\n",
+       "      <th>WoodDeckSF</th>\n",
+       "      <th>OpenPorchSF</th>\n",
+       "      <th>EnclosedPorch</th>\n",
+       "      <th>3SsnPorch</th>\n",
+       "      <th>ScreenPorch</th>\n",
+       "      <th>PoolArea</th>\n",
+       "      <th>MiscVal</th>\n",
+       "      <th>MoSold</th>\n",
+       "      <th>YrSold</th>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>Id</th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "      <th></th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>619</th>\n",
+       "      <td>20</td>\n",
+       "      <td>90.0</td>\n",
+       "      <td>11694</td>\n",
+       "      <td>9</td>\n",
+       "      <td>5</td>\n",
+       "      <td>2007</td>\n",
+       "      <td>2007</td>\n",
+       "      <td>452.0</td>\n",
+       "      <td>48</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>774</td>\n",
+       "      <td>0</td>\n",
+       "      <td>108</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>260</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>7</td>\n",
+       "      <td>2007</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>871</th>\n",
+       "      <td>20</td>\n",
+       "      <td>60.0</td>\n",
+       "      <td>6600</td>\n",
+       "      <td>5</td>\n",
+       "      <td>5</td>\n",
+       "      <td>1962</td>\n",
+       "      <td>1962</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>308</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>8</td>\n",
+       "      <td>2009</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>93</th>\n",
+       "      <td>30</td>\n",
+       "      <td>80.0</td>\n",
+       "      <td>13360</td>\n",
+       "      <td>5</td>\n",
+       "      <td>7</td>\n",
+       "      <td>1921</td>\n",
+       "      <td>2006</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>713</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>432</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>44</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>8</td>\n",
+       "      <td>2009</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>818</th>\n",
+       "      <td>20</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>13265</td>\n",
+       "      <td>8</td>\n",
+       "      <td>5</td>\n",
+       "      <td>2002</td>\n",
+       "      <td>2002</td>\n",
+       "      <td>148.0</td>\n",
+       "      <td>1218</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>857</td>\n",
+       "      <td>150</td>\n",
+       "      <td>59</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>7</td>\n",
+       "      <td>2008</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>303</th>\n",
+       "      <td>20</td>\n",
+       "      <td>118.0</td>\n",
+       "      <td>13704</td>\n",
+       "      <td>7</td>\n",
+       "      <td>5</td>\n",
+       "      <td>2001</td>\n",
+       "      <td>2002</td>\n",
+       "      <td>150.0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>...</td>\n",
+       "      <td>843</td>\n",
+       "      <td>468</td>\n",
+       "      <td>81</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>1</td>\n",
+       "      <td>2006</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>5 rows × 36 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "     MSSubClass  LotFrontage  LotArea  OverallQual  OverallCond  YearBuilt  \\\n",
+       "Id                                                                           \n",
+       "619          20         90.0    11694            9            5       2007   \n",
+       "871          20         60.0     6600            5            5       1962   \n",
+       "93           30         80.0    13360            5            7       1921   \n",
+       "818          20          NaN    13265            8            5       2002   \n",
+       "303          20        118.0    13704            7            5       2001   \n",
+       "\n",
+       "     YearRemodAdd  MasVnrArea  BsmtFinSF1  BsmtFinSF2  ...  GarageArea  \\\n",
+       "Id                                                     ...               \n",
+       "619          2007       452.0          48           0  ...         774   \n",
+       "871          1962         0.0           0           0  ...         308   \n",
+       "93           2006         0.0         713           0  ...         432   \n",
+       "818          2002       148.0        1218           0  ...         857   \n",
+       "303          2002       150.0           0           0  ...         843   \n",
+       "\n",
+       "     WoodDeckSF  OpenPorchSF  EnclosedPorch  3SsnPorch  ScreenPorch  PoolArea  \\\n",
+       "Id                                                                              \n",
+       "619           0          108              0          0          260         0   \n",
+       "871           0            0              0          0            0         0   \n",
+       "93            0            0             44          0            0         0   \n",
+       "818         150           59              0          0            0         0   \n",
+       "303         468           81              0          0            0         0   \n",
+       "\n",
+       "     MiscVal  MoSold  YrSold  \n",
+       "Id                            \n",
+       "619        0       7    2007  \n",
+       "871        0       8    2009  \n",
+       "93         0       8    2009  \n",
+       "818        0       7    2008  \n",
+       "303        0       1    2006  \n",
+       "\n",
+       "[5 rows x 36 columns]"
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "X_train.head()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "98619578",
+   "metadata": {
+    "papermill": {
+     "duration": 0.011049,
+     "end_time": "2024-05-09T13:47:53.060428",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.049379",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "You can already see a few missing values in the first several rows.  In the next step, you'll obtain a more comprehensive understanding of the missing values in the dataset.\n",
+    "\n",
+    "# Step 1: Preliminary investigation\n",
+    "\n",
+    "Run the code cell below without changes."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "dc7ddabb",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.085449Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.084549Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.091846Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.090956Z"
+    },
+    "papermill": {
+     "duration": 0.021721,
+     "end_time": "2024-05-09T13:47:53.093944",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.072223",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(1168, 36)\n",
+      "LotFrontage    212\n",
+      "MasVnrArea       6\n",
+      "GarageYrBlt     58\n",
+      "dtype: int64\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Shape of training data (num_rows, num_columns)\n",
+    "print(X_train.shape)\n",
+    "\n",
+    "# Number of missing values in each column of training data\n",
+    "missing_val_count_by_column = (X_train.isnull().sum())\n",
+    "print(missing_val_count_by_column[missing_val_count_by_column > 0])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "58a41013",
+   "metadata": {
+    "papermill": {
+     "duration": 0.011325,
+     "end_time": "2024-05-09T13:47:53.116497",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.105172",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Part A\n",
+    "\n",
+    "Use the above output to answer the questions below."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "b9fbd682",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.140991Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.140339Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.149069Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.148160Z"
+    },
+    "papermill": {
+     "duration": 0.023063,
+     "end_time": "2024-05-09T13:47:53.151002",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.127939",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 1, \"questionId\": \"1.1_InvestigateEquality\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc33\">Correct</span>"
+      ],
+      "text/plain": [
+       "Correct"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Fill in the line below: How many rows are in the training data?\n",
+    "num_rows = 1168\n",
+    "\n",
+    "# Fill in the line below: How many columns in the training data\n",
+    "# have missing values?\n",
+    "num_cols_with_missing = 3\n",
+    "\n",
+    "# Fill in the line below: How many missing entries are contained in \n",
+    "# all of the training data?\n",
+    "tot_missing = 276\n",
+    "\n",
+    "# Check your answers\n",
+    "step_1.a.check()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "1b65413e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.175584Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.175176Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.179576Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.178574Z"
+    },
+    "papermill": {
+     "duration": 0.019121,
+     "end_time": "2024-05-09T13:47:53.181701",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.162580",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# Lines below will give you a hint or solution code\n",
+    "#step_1.a.hint()\n",
+    "#step_1.a.solution()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "74f3262b",
+   "metadata": {
+    "papermill": {
+     "duration": 0.011116,
+     "end_time": "2024-05-09T13:47:53.204414",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.193298",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Part B\n",
+    "Considering your answers above, what do you think is likely the best approach to dealing with the missing values?"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "4858c130",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.230328Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.229605Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.238289Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.237240Z"
+    },
+    "papermill": {
+     "duration": 0.023982,
+     "end_time": "2024-05-09T13:47:53.240634",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.216652",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 4, \"questionId\": \"1.2_InvestigateThought\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc33\">Correct:</span> \n",
+       "\n",
+       "Since there are relatively few missing entries in the data (the column with the greatest percentage of missing values is missing less than 20% of its entries), we can expect that dropping columns is unlikely to yield good results.  This is because we'd be throwing away a lot of valuable data, and so imputation will likely perform better."
+      ],
+      "text/plain": [
+       "Correct: \n",
+       "\n",
+       "Since there are relatively few missing entries in the data (the column with the greatest percentage of missing values is missing less than 20% of its entries), we can expect that dropping columns is unlikely to yield good results.  This is because we'd be throwing away a lot of valuable data, and so imputation will likely perform better."
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Check your answer (Run this code cell to receive credit!)\n",
+    "step_1.b.check()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "a3e8b537",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.266831Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.266464Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.270729Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.269781Z"
+    },
+    "papermill": {
+     "duration": 0.019597,
+     "end_time": "2024-05-09T13:47:53.272844",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.253247",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "#step_1.b.hint()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "347232f5",
+   "metadata": {
+    "papermill": {
+     "duration": 0.014696,
+     "end_time": "2024-05-09T13:47:53.299987",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.285291",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "To compare different approaches to dealing with missing values, you'll use the same `score_dataset()` function from the tutorial.  This function reports the [mean absolute error](https://en.wikipedia.org/wiki/Mean_absolute_error) (MAE) from a random forest model."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "0a6cd447",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.326505Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.326124Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.628084Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.627182Z"
+    },
+    "papermill": {
+     "duration": 0.318482,
+     "end_time": "2024-05-09T13:47:53.630876",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.312394",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.ensemble import RandomForestRegressor\n",
+    "from sklearn.metrics import mean_absolute_error\n",
+    "\n",
+    "# Function for comparing different approaches\n",
+    "def score_dataset(X_train, X_valid, y_train, y_valid):\n",
+    "    model = RandomForestRegressor(n_estimators=100, random_state=0)\n",
+    "    model.fit(X_train, y_train)\n",
+    "    preds = model.predict(X_valid)\n",
+    "    return mean_absolute_error(y_valid, preds)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "825145e5",
+   "metadata": {
+    "papermill": {
+     "duration": 0.0114,
+     "end_time": "2024-05-09T13:47:53.654315",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.642915",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Step 2: Drop columns with missing values\n",
+    "\n",
+    "In this step, you'll preprocess the data in `X_train` and `X_valid` to remove columns with missing values.  Set the preprocessed DataFrames to `reduced_X_train` and `reduced_X_valid`, respectively.  "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "855a629c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.680174Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.679169Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.703429Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.702474Z"
+    },
+    "papermill": {
+     "duration": 0.039468,
+     "end_time": "2024-05-09T13:47:53.705686",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.666218",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 2, \"questionId\": \"2_DropMissing\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc33\">Correct</span>"
+      ],
+      "text/plain": [
+       "Correct"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Fill in the line below: get names of columns with missing values\n",
+    "cols_with_missing = [col for col in X_train.columns\n",
+    "                     if X_train[col].isnull().any()] # Your code here\n",
+    "\n",
+    "# Fill in the lines below: drop columns in training and validation data\n",
+    "reduced_X_train = X_train.drop(cols_with_missing, axis=1)\n",
+    "reduced_X_valid = X_valid.drop(cols_with_missing, axis=1)\n",
+    "\n",
+    "# Check your answers\n",
+    "step_2.check()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "16caf281",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.731922Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.731539Z",
+     "iopub.status.idle": "2024-05-09T13:47:53.743932Z",
+     "shell.execute_reply": "2024-05-09T13:47:53.742963Z"
+    },
+    "papermill": {
+     "duration": 0.028325,
+     "end_time": "2024-05-09T13:47:53.746172",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.717847",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 2, \"questionType\": 2, \"questionId\": \"2_DropMissing\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#3366cc\">Hint:</span> Begin by finding the list of columns in the data with missing values.  Then, drop these columns in both the training and validation data with the `drop()` method."
+      ],
+      "text/plain": [
+       "Hint: Begin by finding the list of columns in the data with missing values.  Then, drop these columns in both the training and validation data with the `drop()` method."
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 3, \"questionType\": 2, \"questionId\": \"2_DropMissing\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc99\">Solution:</span> \n",
+       "```python\n",
+       "# Get names of columns with missing values\n",
+       "cols_with_missing = [col for col in X_train.columns\n",
+       "                     if X_train[col].isnull().any()]\n",
+       "\n",
+       "# Drop columns in training and validation data\n",
+       "reduced_X_train = X_train.drop(cols_with_missing, axis=1)\n",
+       "reduced_X_valid = X_valid.drop(cols_with_missing, axis=1)\n",
+       "\n",
+       "```"
+      ],
+      "text/plain": [
+       "Solution: \n",
+       "```python\n",
+       "# Get names of columns with missing values\n",
+       "cols_with_missing = [col for col in X_train.columns\n",
+       "                     if X_train[col].isnull().any()]\n",
+       "\n",
+       "# Drop columns in training and validation data\n",
+       "reduced_X_train = X_train.drop(cols_with_missing, axis=1)\n",
+       "reduced_X_valid = X_valid.drop(cols_with_missing, axis=1)\n",
+       "\n",
+       "```"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Lines below will give you a hint or solution code\n",
+    "step_2.hint()\n",
+    "step_2.solution()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d311ae56",
+   "metadata": {
+    "papermill": {
+     "duration": 0.012892,
+     "end_time": "2024-05-09T13:47:53.772457",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.759565",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Run the next code cell without changes to obtain the MAE for this approach."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "db661404",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:53.799431Z",
+     "iopub.status.busy": "2024-05-09T13:47:53.799046Z",
+     "iopub.status.idle": "2024-05-09T13:47:55.012827Z",
+     "shell.execute_reply": "2024-05-09T13:47:55.011799Z"
+    },
+    "papermill": {
+     "duration": 1.230093,
+     "end_time": "2024-05-09T13:47:55.015299",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:53.785206",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "MAE (Drop columns with missing values):\n",
+      "17837.82570776256\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"MAE (Drop columns with missing values):\")\n",
+    "print(score_dataset(reduced_X_train, reduced_X_valid, y_train, y_valid))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "af021853",
+   "metadata": {
+    "papermill": {
+     "duration": 0.013572,
+     "end_time": "2024-05-09T13:47:55.042811",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:55.029239",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Step 3: Imputation\n",
+    "\n",
+    "### Part A\n",
+    "\n",
+    "Use the next code cell to impute missing values with the mean value along each column.  Set the preprocessed DataFrames to `imputed_X_train` and `imputed_X_valid`.  Make sure that the column names match those in `X_train` and `X_valid`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "c1420c75",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:55.073987Z",
+     "iopub.status.busy": "2024-05-09T13:47:55.072942Z",
+     "iopub.status.idle": "2024-05-09T13:47:55.106103Z",
+     "shell.execute_reply": "2024-05-09T13:47:55.105100Z"
+    },
+    "papermill": {
+     "duration": 0.050527,
+     "end_time": "2024-05-09T13:47:55.108438",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:55.057911",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 2, \"questionId\": \"3.1_ImputeCode\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc33\">Correct</span>"
+      ],
+      "text/plain": [
+       "Correct"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "from sklearn.impute import SimpleImputer\n",
+    "\n",
+    "# Fill in the lines below: imputation\n",
+    "my_imputer = SimpleImputer() # Your code here\n",
+    "imputed_X_train = pd.DataFrame(my_imputer.fit_transform(X_train))\n",
+    "imputed_X_valid = pd.DataFrame(my_imputer.transform(X_valid))\n",
+    "\n",
+    "# Fill in the lines below: imputation removed column names; put them back\n",
+    "imputed_X_train.columns = X_train.columns\n",
+    "imputed_X_valid.columns = X_valid.columns\n",
+    "\n",
+    "# Check your answers\n",
+    "step_3.a.check()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "bf335bf8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:55.138403Z",
+     "iopub.status.busy": "2024-05-09T13:47:55.137530Z",
+     "iopub.status.idle": "2024-05-09T13:47:55.149951Z",
+     "shell.execute_reply": "2024-05-09T13:47:55.148997Z"
+    },
+    "papermill": {
+     "duration": 0.029874,
+     "end_time": "2024-05-09T13:47:55.152192",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:55.122318",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 2, \"questionType\": 2, \"questionId\": \"3.1_ImputeCode\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#3366cc\">Hint:</span> Begin by defining an instance of the `SimpleImputer()` class.  Then, use the imputer to fit and transform the training data, before transforming the validation data. Get the original column names from the original DataFrames `X_train` and `X_valid`."
+      ],
+      "text/plain": [
+       "Hint: Begin by defining an instance of the `SimpleImputer()` class.  Then, use the imputer to fit and transform the training data, before transforming the validation data. Get the original column names from the original DataFrames `X_train` and `X_valid`."
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 3, \"questionType\": 2, \"questionId\": \"3.1_ImputeCode\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc99\">Solution:</span> \n",
+       "```python\n",
+       "# Imputation\n",
+       "my_imputer = SimpleImputer()\n",
+       "imputed_X_train = pd.DataFrame(my_imputer.fit_transform(X_train))\n",
+       "imputed_X_valid = pd.DataFrame(my_imputer.transform(X_valid))\n",
+       "\n",
+       "# Imputation removed column names; put them back\n",
+       "imputed_X_train.columns = X_train.columns\n",
+       "imputed_X_valid.columns = X_valid.columns\n",
+       "\n",
+       "```"
+      ],
+      "text/plain": [
+       "Solution: \n",
+       "```python\n",
+       "# Imputation\n",
+       "my_imputer = SimpleImputer()\n",
+       "imputed_X_train = pd.DataFrame(my_imputer.fit_transform(X_train))\n",
+       "imputed_X_valid = pd.DataFrame(my_imputer.transform(X_valid))\n",
+       "\n",
+       "# Imputation removed column names; put them back\n",
+       "imputed_X_train.columns = X_train.columns\n",
+       "imputed_X_valid.columns = X_valid.columns\n",
+       "\n",
+       "```"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Lines below will give you a hint or solution code\n",
+    "step_3.a.hint()\n",
+    "step_3.a.solution()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "02e3e2d6",
+   "metadata": {
+    "papermill": {
+     "duration": 0.014526,
+     "end_time": "2024-05-09T13:47:55.181684",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:55.167158",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Run the next code cell without changes to obtain the MAE for this approach."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "41a56f58",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:55.213234Z",
+     "iopub.status.busy": "2024-05-09T13:47:55.212470Z",
+     "iopub.status.idle": "2024-05-09T13:47:56.549158Z",
+     "shell.execute_reply": "2024-05-09T13:47:56.548088Z"
+    },
+    "papermill": {
+     "duration": 1.354933,
+     "end_time": "2024-05-09T13:47:56.551461",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:55.196528",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "MAE (Imputation):\n",
+      "18062.894611872147\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"MAE (Imputation):\")\n",
+    "print(score_dataset(imputed_X_train, imputed_X_valid, y_train, y_valid))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f401cde9",
+   "metadata": {
+    "papermill": {
+     "duration": 0.015571,
+     "end_time": "2024-05-09T13:47:56.581398",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:56.565827",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Part B\n",
+    "\n",
+    "Compare the MAE from each approach.  Does anything surprise you about the results?  Why do you think one approach performed better than the other?"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "1058cc6e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:56.611429Z",
+     "iopub.status.busy": "2024-05-09T13:47:56.611036Z",
+     "iopub.status.idle": "2024-05-09T13:47:56.618761Z",
+     "shell.execute_reply": "2024-05-09T13:47:56.617912Z"
+    },
+    "papermill": {
+     "duration": 0.025167,
+     "end_time": "2024-05-09T13:47:56.621014",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:56.595847",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 4, \"questionId\": \"3.2_ImputeThought\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc33\">Correct:</span> \n",
+       "\n",
+       "Given that thre are so few missing values in the dataset, we'd expect imputation to perform better than dropping columns entirely.  However, we see that dropping columns performs slightly better!  While this can probably partially be attributed to noise in the dataset, another potential explanation is that the imputation method is not a great match to this dataset.  That is, maybe instead of filling in the mean value, it makes more sense to set every missing value to a value of 0, to fill in the most frequently encountered value, or to use some other method.  For instance, consider the `GarageYrBlt` column (which indicates the year that the garage was built).  It's likely that in some cases, a missing value could indicate a house that does not have a garage.  Does it make more sense to fill in the median value along each column in this case?  Or could we get better results by filling in the minimum value along each column?  It's not quite clear what's best in this case, but perhaps we can rule out some options immediately - for instance, setting missing values in this column to 0 is likely to yield horrible results!"
+      ],
+      "text/plain": [
+       "Correct: \n",
+       "\n",
+       "Given that thre are so few missing values in the dataset, we'd expect imputation to perform better than dropping columns entirely.  However, we see that dropping columns performs slightly better!  While this can probably partially be attributed to noise in the dataset, another potential explanation is that the imputation method is not a great match to this dataset.  That is, maybe instead of filling in the mean value, it makes more sense to set every missing value to a value of 0, to fill in the most frequently encountered value, or to use some other method.  For instance, consider the `GarageYrBlt` column (which indicates the year that the garage was built).  It's likely that in some cases, a missing value could indicate a house that does not have a garage.  Does it make more sense to fill in the median value along each column in this case?  Or could we get better results by filling in the minimum value along each column?  It's not quite clear what's best in this case, but perhaps we can rule out some options immediately - for instance, setting missing values in this column to 0 is likely to yield horrible results!"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Check your answer (Run this code cell to receive credit!)\n",
+    "step_3.b.check()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "07f84064",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:56.651587Z",
+     "iopub.status.busy": "2024-05-09T13:47:56.651214Z",
+     "iopub.status.idle": "2024-05-09T13:47:56.658908Z",
+     "shell.execute_reply": "2024-05-09T13:47:56.658048Z"
+    },
+    "papermill": {
+     "duration": 0.025687,
+     "end_time": "2024-05-09T13:47:56.661240",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:56.635553",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 2, \"questionType\": 4, \"questionId\": \"3.2_ImputeThought\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#3366cc\">Hint:</span> Did removing missing values yield a larger or smaller MAE than imputation? Does this agree with the coding example from the tutorial?"
+      ],
+      "text/plain": [
+       "Hint: Did removing missing values yield a larger or smaller MAE than imputation? Does this agree with the coding example from the tutorial?"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "step_3.b.hint()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f006092a",
+   "metadata": {
+    "papermill": {
+     "duration": 0.014753,
+     "end_time": "2024-05-09T13:47:56.691101",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:56.676348",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Step 4: Generate test predictions\n",
+    "\n",
+    "In this final step, you'll use any approach of your choosing to deal with missing values.  Once you've preprocessed the training and validation features, you'll train and evaluate a random forest model.  Then, you'll preprocess the test data before generating predictions that can be submitted to the competition!\n",
+    "\n",
+    "### Part A\n",
+    "\n",
+    "Use the next code cell to preprocess the training and validation data.  Set the preprocessed DataFrames to `final_X_train` and `final_X_valid`.  **You can use any approach of your choosing here!**  in order for this step to be marked as correct, you need only ensure:\n",
+    "- the preprocessed DataFrames have the same number of columns,\n",
+    "- the preprocessed DataFrames have no missing values, \n",
+    "- `final_X_train` and `y_train` have the same number of rows, and\n",
+    "- `final_X_valid` and `y_valid` have the same number of rows."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "04d5cbcc",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:56.722674Z",
+     "iopub.status.busy": "2024-05-09T13:47:56.722314Z",
+     "iopub.status.idle": "2024-05-09T13:47:58.145263Z",
+     "shell.execute_reply": "2024-05-09T13:47:58.144192Z"
+    },
+    "papermill": {
+     "duration": 1.444011,
+     "end_time": "2024-05-09T13:47:58.149641",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:56.705630",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "MAE (Imputation):\n",
+      "17791.59899543379\n"
+     ]
+    },
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 2, \"questionId\": \"4.1_PredsCodeA\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc33\">Correct</span>"
+      ],
+      "text/plain": [
+       "Correct"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Preprocessed training and validation features\n",
+    "final_imputer = SimpleImputer(strategy='median')\n",
+    "final_X_train = pd.DataFrame(final_imputer.fit_transform(X_train))\n",
+    "final_X_valid = pd.DataFrame(final_imputer.transform(X_valid))\n",
+    "\n",
+    "# Imputation removed column names; put them back\n",
+    "final_X_train.columns = X_train.columns\n",
+    "final_X_valid.columns = X_valid.columns\n",
+    "\n",
+    "# final_X_train.head()\n",
+    "\n",
+    "print(\"MAE (Imputation):\")\n",
+    "print(score_dataset(final_X_train, final_X_valid, y_train, y_valid))\n",
+    "\n",
+    "# # Check your answers\n",
+    "step_4.a.check()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "4cc9bc17",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:58.197178Z",
+     "iopub.status.busy": "2024-05-09T13:47:58.195898Z",
+     "iopub.status.idle": "2024-05-09T13:47:58.210490Z",
+     "shell.execute_reply": "2024-05-09T13:47:58.208922Z"
+    },
+    "papermill": {
+     "duration": 0.04201,
+     "end_time": "2024-05-09T13:47:58.214048",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:58.172038",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 2, \"questionType\": 2, \"questionId\": \"4.1_PredsCodeA\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#3366cc\">Hint:</span> Use any approach of your choosing to deal with missing values in the data.  For inspiration, check out the code from the tutorial!"
+      ],
+      "text/plain": [
+       "Hint: Use any approach of your choosing to deal with missing values in the data.  For inspiration, check out the code from the tutorial!"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 3, \"questionType\": 2, \"questionId\": \"4.1_PredsCodeA\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc99\">Solution:</span> \n",
+       "```python\n",
+       "# Imputation\n",
+       "final_imputer = SimpleImputer(strategy='median')\n",
+       "final_X_train = pd.DataFrame(final_imputer.fit_transform(X_train))\n",
+       "final_X_valid = pd.DataFrame(final_imputer.transform(X_valid))\n",
+       "\n",
+       "# Imputation removed column names; put them back\n",
+       "final_X_train.columns = X_train.columns\n",
+       "final_X_valid.columns = X_valid.columns\n",
+       "\n",
+       "```"
+      ],
+      "text/plain": [
+       "Solution: \n",
+       "```python\n",
+       "# Imputation\n",
+       "final_imputer = SimpleImputer(strategy='median')\n",
+       "final_X_train = pd.DataFrame(final_imputer.fit_transform(X_train))\n",
+       "final_X_valid = pd.DataFrame(final_imputer.transform(X_valid))\n",
+       "\n",
+       "# Imputation removed column names; put them back\n",
+       "final_X_train.columns = X_train.columns\n",
+       "final_X_valid.columns = X_valid.columns\n",
+       "\n",
+       "```"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Lines below will give you a hint or solution code\n",
+    "step_4.a.hint()\n",
+    "step_4.a.solution()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cc7e4f8c",
+   "metadata": {
+    "papermill": {
+     "duration": 0.02238,
+     "end_time": "2024-05-09T13:47:58.259507",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:58.237127",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Run the next code cell to train and evaluate a random forest model.  (*Note that we don't use the `score_dataset()` function above, because we will soon use the trained model to generate test predictions!*)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "5a6fed73",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:58.351731Z",
+     "iopub.status.busy": "2024-05-09T13:47:58.350869Z",
+     "iopub.status.idle": "2024-05-09T13:47:59.716112Z",
+     "shell.execute_reply": "2024-05-09T13:47:59.715052Z"
+    },
+    "papermill": {
+     "duration": 1.385613,
+     "end_time": "2024-05-09T13:47:59.718543",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:58.332930",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "MAE (Your approach):\n",
+      "17791.59899543379\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Define and fit model\n",
+    "model = RandomForestRegressor(n_estimators=100, random_state=0)\n",
+    "model.fit(final_X_train, y_train)\n",
+    "\n",
+    "# Get validation predictions and MAE\n",
+    "preds_valid = model.predict(final_X_valid)\n",
+    "print(\"MAE (Your approach):\")\n",
+    "print(mean_absolute_error(y_valid, preds_valid))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "e666b6dc",
+   "metadata": {
+    "papermill": {
+     "duration": 0.017242,
+     "end_time": "2024-05-09T13:47:59.753092",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:59.735850",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Part B\n",
+    "\n",
+    "Use the next code cell to preprocess your test data.  Make sure that you use a method that agrees with how you preprocessed the training and validation data, and set the preprocessed test features to `final_X_test`.\n",
+    "\n",
+    "Then, use the preprocessed test features and the trained model to generate test predictions in `preds_test`.\n",
+    "\n",
+    "In order for this step to be marked correct, you need only ensure:\n",
+    "- the preprocessed test DataFrame has no missing values, and\n",
+    "- `final_X_test` has the same number of rows as `X_test`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "024eaa54",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:59.789691Z",
+     "iopub.status.busy": "2024-05-09T13:47:59.789320Z",
+     "iopub.status.idle": "2024-05-09T13:47:59.838541Z",
+     "shell.execute_reply": "2024-05-09T13:47:59.837584Z"
+    },
+    "papermill": {
+     "duration": 0.07164,
+     "end_time": "2024-05-09T13:47:59.842136",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:59.770496",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/opt/conda/lib/python3.10/site-packages/sklearn/base.py:439: UserWarning: X does not have valid feature names, but RandomForestRegressor was fitted with feature names\n",
+      "  warnings.warn(\n"
+     ]
+    },
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"outcomeType\": 1, \"valueTowardsCompletion\": 1.0, \"interactionType\": 1, \"questionType\": 2, \"questionId\": \"4.2_PredsCodeB\", \"learnToolsVersion\": \"0.3.4\", \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\"}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc33\">Correct</span>"
+      ],
+      "text/plain": [
+       "Correct"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Fill in the line below: preprocess test data\n",
+    "final_X_test = pd.DataFrame(final_imputer.transform(X_test))\n",
+    "\n",
+    "# Fill in the line below: get test predictions\n",
+    "preds_test = model.predict(final_X_test)\n",
+    "\n",
+    "# Check your answers\n",
+    "step_4.b.check()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "b14f6687",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:59.880030Z",
+     "iopub.status.busy": "2024-05-09T13:47:59.879348Z",
+     "iopub.status.idle": "2024-05-09T13:47:59.891329Z",
+     "shell.execute_reply": "2024-05-09T13:47:59.890300Z"
+    },
+    "papermill": {
+     "duration": 0.03321,
+     "end_time": "2024-05-09T13:47:59.893603",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:59.860393",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 2, \"questionType\": 2, \"questionId\": \"4.2_PredsCodeB\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#3366cc\">Hint:</span> After preprocessing the test data, you can get the model's predictions by using `model.predict()`."
+      ],
+      "text/plain": [
+       "Hint: After preprocessing the test data, you can get the model's predictions by using `model.predict()`."
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "application/javascript": [
+       "parent.postMessage({\"jupyterEvent\": \"custom.exercise_interaction\", \"data\": {\"interactionType\": 3, \"questionType\": 2, \"questionId\": \"4.2_PredsCodeB\", \"learnToolsVersion\": \"0.3.4\", \"valueTowardsCompletion\": 0.0, \"failureMessage\": \"\", \"exceptionClass\": \"\", \"trace\": \"\", \"outcomeType\": 4}}, \"*\")"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Javascript object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/markdown": [
+       "<span style=\"color:#33cc99\">Solution:</span> \n",
+       "```python\n",
+       "# Preprocess test data\n",
+       "final_X_test = pd.DataFrame(final_imputer.transform(X_test))\n",
+       "\n",
+       "# Get test predictions\n",
+       "preds_test = model.predict(final_X_test)\n",
+       "\n",
+       "```"
+      ],
+      "text/plain": [
+       "Solution: \n",
+       "```python\n",
+       "# Preprocess test data\n",
+       "final_X_test = pd.DataFrame(final_imputer.transform(X_test))\n",
+       "\n",
+       "# Get test predictions\n",
+       "preds_test = model.predict(final_X_test)\n",
+       "\n",
+       "```"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Lines below will give you a hint or solution code\n",
+    "step_4.b.hint()\n",
+    "step_4.b.solution()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f9a2b139",
+   "metadata": {
+    "papermill": {
+     "duration": 0.017701,
+     "end_time": "2024-05-09T13:47:59.929323",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:59.911622",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Run the next code cell without changes to save your results to a CSV file that can be submitted directly to the competition."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "92d75509",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-05-09T13:47:59.965855Z",
+     "iopub.status.busy": "2024-05-09T13:47:59.964717Z",
+     "iopub.status.idle": "2024-05-09T13:47:59.975857Z",
+     "shell.execute_reply": "2024-05-09T13:47:59.975074Z"
+    },
+    "papermill": {
+     "duration": 0.031371,
+     "end_time": "2024-05-09T13:47:59.977950",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:59.946579",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# Save test predictions to file\n",
+    "output = pd.DataFrame({'Id': X_test.index,\n",
+    "                       'SalePrice': preds_test})\n",
+    "output.to_csv('submission.csv', index=False)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a1322c33",
+   "metadata": {
+    "papermill": {
+     "duration": 0.017069,
+     "end_time": "2024-05-09T13:48:00.012740",
+     "exception": false,
+     "start_time": "2024-05-09T13:47:59.995671",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Submit your results\n",
+    "\n",
+    "Once you have successfully completed Step 4, you're ready to submit your results to the leaderboard!  (_You also learned how to do this in the previous exercise.  If you need a reminder of how to do this, please use the instructions below._)  \n",
+    "\n",
+    "First, you'll need to join the competition if you haven't already.  So open a new window by clicking on [this link](https://www.kaggle.com/c/home-data-for-ml-course).  Then click on the **Join Competition** button.\n",
+    "\n",
+    "![join competition image](https://storage.googleapis.com/kaggle-media/learn/images/wLmFtH3.png)\n",
+    "\n",
+    "Next, follow the instructions below:\n",
+    "1. Begin by clicking on the **Save Version** button in the top right corner of the window.  This will generate a pop-up window.  \n",
+    "2. Ensure that the **Save and Run All** option is selected, and then click on the **Save** button.\n",
+    "3. This generates a window in the bottom left corner of the notebook.  After it has finished running, click on the number to the right of the **Save Version** button.  This pulls up a list of versions on the right of the screen.  Click on the ellipsis **(...)** to the right of the most recent version, and select **Open in Viewer**.  This brings you into view mode of the same page. You will need to scroll down to get back to these instructions.\n",
+    "4. Click on the **Data** tab near the top of the screen.  Then, click on the file you would like to submit, and click on the **Submit** button to submit your results to the leaderboard.\n",
+    "\n",
+    "You have now successfully submitted to the competition!\n",
+    "\n",
+    "If you want to keep working to improve your performance, select the **Edit** button in the top right of the screen. Then you can change your code and repeat the process. There's a lot of room to improve, and you will climb up the leaderboard as you work.\n",
+    "\n",
+    "\n",
+    "# Keep going\n",
+    "\n",
+    "Move on to learn what **[categorical variables](https://www.kaggle.com/alexisbcook/categorical-variables)** are, along with how to incorporate them into your machine learning models.  Categorical variables are very common in real-world data, but you'll get an error if you try to plug them into your models without processing them first!"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6b880352",
+   "metadata": {
+    "papermill": {
+     "duration": 0.017416,
+     "end_time": "2024-05-09T13:48:00.047844",
+     "exception": false,
+     "start_time": "2024-05-09T13:48:00.030428",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "---\n",
+    "\n",
+    "\n",
+    "\n",
+    "\n",
+    "*Have questions or comments? Visit the [course discussion forum](https://www.kaggle.com/learn/intermediate-machine-learning/discussion) to chat with other learners.*"
+   ]
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "none",
+   "dataSources": [
+    {
+     "databundleVersionId": 111096,
+     "sourceId": 10211,
+     "sourceType": "competition"
+    }
+   ],
+   "isGpuEnabled": false,
+   "isInternetEnabled": false,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.13"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 12.31841,
+   "end_time": "2024-05-09T13:48:00.586381",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2024-05-09T13:47:48.267971",
+   "version": "2.5.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
